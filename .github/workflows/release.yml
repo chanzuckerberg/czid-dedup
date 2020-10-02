@@ -19,7 +19,7 @@ jobs:
               uses: svenstaro/upload-release-action@v2
               with:
                 repo_token: ${{ secrets.GITHUB_TOKEN }}
-                file: target/release/idseq-dedup
+                file: ${{ matrix.os == 'windows' && 'target\release\idseq-dedup' || 'target/release/idseq-dedup' }}
                 asset_name: idseq-dedup-${{ runner.os }}
                 tag: ${{ github.ref }}
                 overwrite: true
