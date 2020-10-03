@@ -78,3 +78,15 @@ pub fn fastx_type<P: AsRef<std::path::Path>>(path: P) -> Result<FastxType, std::
         _ => Ok(FastxType::Invalid),
     }
 }
+
+impl std::fmt::Display for FastxType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            FastxType::Fasta => "fasta",
+            FastxType::Fastq => "fastq",
+            FastxType::Invalid => "invalid",
+        };
+        write!(f, "{}", s)
+    }
+}
+

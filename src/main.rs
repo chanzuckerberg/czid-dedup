@@ -35,7 +35,11 @@ macro_rules! dedup {
         let writer_r1 = $fastx::Writer::to_file($output_r1).unwrap();
         match ($inputs.next(), $outputs.next()) {
             (Some(input_r2), Some(output_r2)) => {
-                assert!(fastx::fastx_type(input_r2).unwrap() == $fastx_type_r1, "mismatched filetypes");
+                let fastx_type_r2 = fastx::fastx_type(input_r2).unwrap();
+                if fastx_type_r2 != $fastx_type_r1 {
+                    let message = format!("paired inputs have different file types r1: {}, r2: {}", $fastx_type_r1, fastx_type_r2);
+                    return Err(Box::new(simple_error::simple_error!(message)))
+                }
                 let records_r2 = $fastx::Reader::from_file(input_r2).unwrap().records();
                 let writer_r2 = $fastx::Writer::to_file(output_r2).unwrap();
                 let records = paired::PairedRecords::new(records_r1, records_r2);
@@ -80,10 +84,10 @@ fn pair<T: fastx::Record, R: Iterator<Item = Result<T, std::io::Error>>, S: fast
 
 
 fn run_dedup<T: Into<std::ffi::OsString> + Clone, R: IntoIterator<Item = T>>(args: R) -> Result<clusters::Clusters<File>, Box<dyn Error>> {
-    let matches = App::new("Dedup Prototype")
-                        .version("0.0")
-                        .author("Todd M. <todd@morsecodist.io>")
-                        .about("Deduplicates FASTQs")
+    let matches = App::new(clap::crate_name!())
+                        .version(clap::crate_version!())
+                        .author(clap::crate_authors!())
+                        .about(clap::crate_description!())
                         .arg(Arg::with_name("inputs")
                             .short("i")
                             .long("inputs")
@@ -137,7 +141,7 @@ fn run_dedup<T: Into<std::ffi::OsString> + Clone, R: IntoIterator<Item = T>>(arg
 
 fn main() {
     match run_dedup(std::env::args()) {
-        Err(err) => println!("{:?}", err),
+        Err(err) => println!("{}", err.to_string()),
         Ok(info) => {
             println!("duplicates:   {:width$}", info.duplicate_records(), width=16);
             println!("unique reads: {:width$}", info.unique_records(), width=16);
@@ -204,6 +208,30 @@ mod test {
         let args = ["executable", "-i", &input_path_r1, "-i", &input_path_r2, "-o", &output_path_r1, "-o", &output_path_r2, "-c", &cluster_path];
         let result = run_dedup(&args).expect("don't break");
         assert_eq!(result.total_records(), 1);
+        dir.close().expect("don't break");
+    }
+
+    #[test]
+    fn test_run_dedup_paired_mismatched_files() {
+        let dir = tempdir().unwrap();
+        let input_path_r1 = dir.path().join("input-r1.fasta").to_str().unwrap().to_string();
+        let input_path_r2 = dir.path().join("input-r2.fastq").to_str().unwrap().to_string();
+        let output_path_r1 = dir.path().join("output-r1.fasta").to_str().unwrap().to_string();
+        let output_path_r2 = dir.path().join("output-r2.fasta").to_str().unwrap().to_string();
+        let cluster_path = dir.path().join("cluster.csv").to_str().unwrap().to_string();
+
+        {
+            let mut writer_r1 = fasta::Writer::to_file(&input_path_r1).expect("don't break");
+            let mut writer_r2 = fastq::Writer::to_file(&input_path_r2).expect("don't break");
+            let seq = random_seq(20);
+            writer_r1.write("id_a", None, &seq).expect("don't break");
+            writer_r2.write("id_a", None, &seq, &seq).expect("don't break");
+        }
+
+        let args = ["executable", "-i", &input_path_r1, "-i", &input_path_r2, "-o", &output_path_r1, "-o", &output_path_r2, "-c", &cluster_path];
+        let result = run_dedup(&args);
+        let message = result.err().expect("should error on mismatched inputs").to_string();
+        assert_eq!(message, "paired inputs have different file types r1: fasta, r2: fastq");
         dir.close().expect("don't break");
     }
 }

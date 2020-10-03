@@ -23,12 +23,13 @@ impl <A: fastx::Record, T: Iterator<Item = Result<A, std::io::Error>>> Iterator 
                 if r1_record.id() == r2_record.id() {
                     Some(Ok((r1_record, r2_record)))
                 } else {
-                    Some(Err(Box::new(simple_error::simple_error!("paired reads have different read ids"))))
+                    let message = format!("read pair had different read IDs: ({}, {})", r1_record.id(), r2_record.id());
+                    Some(Err(Box::new(simple_error::simple_error!(message))))
                 }
             },
             (None, None) => None,
-            (Some(_), None) => Some(Err(Box::new(simple_error::simple_error!("misaligned paired reads")))),
-            (None, Some(_)) => Some(Err(Box::new(simple_error::simple_error!("misaligned paired reads")))),
+            (Some(_), None) => Some(Err(Box::new(simple_error::simple_error!("reached the end of r2 before r1")))),
+            (None, Some(_)) => Some(Err(Box::new(simple_error::simple_error!("reached the end of r1 before r2")))),
             (Some(Err(err)), _) => Some(Err(Box::new(err))),
             (_, Some(Err(err))) => Some(Err(Box::new(err))),
         }
@@ -41,16 +42,26 @@ mod test {
     use bio::io::fasta;
 
     #[test]
-    fn test_different_lengths() {
+    fn test_r1_longer() {
         let record = fasta::Record::with_attrs("id_a", None, &[]);
         let records_r1 = vec![Ok(record)].into_iter();
         let records_r2 = vec![].into_iter();
         let mut paired_iterator = PairedRecords::new(records_r1, records_r2);
         let result = paired_iterator.next();
 
-        assert_eq!(result.unwrap().err().unwrap().to_string(), "misaligned paired reads");
+        assert_eq!(result.unwrap().err().unwrap().to_string(), "reached the end of r2 before r1");
     }
 
+    #[test]
+    fn test_r2_longer() {
+        let record = fasta::Record::with_attrs("id_a", None, &[]);
+        let records_r1 = vec![].into_iter();
+        let records_r2 = vec![Ok(record)].into_iter();
+        let mut paired_iterator = PairedRecords::new(records_r1, records_r2);
+        let result = paired_iterator.next();
+
+        assert_eq!(result.unwrap().err().unwrap().to_string(), "reached the end of r1 before r2");
+    }
 
     #[test]
     fn test_different_ids() {
@@ -61,6 +72,30 @@ mod test {
         let mut paired_iterator = PairedRecords::new(records_r1, records_r2);
         let result = paired_iterator.next();
 
-        assert_eq!(result.unwrap().err().unwrap().to_string(), "paired reads have different read ids");
+        assert_eq!(result.unwrap().err().unwrap().to_string(), "read pair had different read IDs: (id_a, id_b)");
+    }
+
+
+    struct MockFastx<'a> {
+        id: &'a str,
+        seq: &'a [u8],
+        broken_message: Option<&'a str>
+    }
+
+    impl <'a> fastx::Record for MockFastx<'a> {
+        fn id(&self) -> &str {
+            &self.id
+        }
+
+        fn seq(&self) -> &[u8] {
+            &self.seq
+        }
+
+        fn check(&self) -> Result<(), &str> {
+            match self.broken_message {
+                Some(message) => Err(message),
+                None => Ok(()),
+            }
+        }
     }
 }
