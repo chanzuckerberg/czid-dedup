@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::io::{Error, ErrorKind};
 
 use super::fastx;
 
@@ -19,9 +19,9 @@ impl<T: fastx::Record, R: Iterator<Item = Result<T, std::io::Error>>> PairedReco
 impl<A: fastx::Record, T: Iterator<Item = Result<A, std::io::Error>>> Iterator
     for PairedRecords<A, T>
 {
-    type Item = Result<(A, A), Box<dyn Error>>;
+    type Item = Result<(A, A), Error>;
 
-    fn next(&mut self) -> Option<Result<(A, A), Box<dyn Error>>> {
+    fn next(&mut self) -> Option<Result<(A, A), Error>> {
         match (self.records_r1.next(), self.records_r2.next()) {
             (Some(Ok(r1_record)), Some(Ok(r2_record))) => {
                 if r1_record.id() == r2_record.id() {
@@ -32,18 +32,20 @@ impl<A: fastx::Record, T: Iterator<Item = Result<A, std::io::Error>>> Iterator
                         r1_record.id(),
                         r2_record.id()
                     );
-                    Some(Err(Box::new(simple_error::simple_error!(message))))
+                    Some(Err(Error::new(ErrorKind::InvalidData, message)))
                 }
             }
             (None, None) => None,
-            (Some(_), None) => Some(Err(Box::new(simple_error::simple_error!(
-                "reached the end of r2 before r1"
-            )))),
-            (None, Some(_)) => Some(Err(Box::new(simple_error::simple_error!(
-                "reached the end of r1 before r2"
-            )))),
-            (Some(Err(err)), _) => Some(Err(Box::new(err))),
-            (_, Some(Err(err))) => Some(Err(Box::new(err))),
+            (Some(_), None) => Some(Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                "reached the end of r2 before r1",
+            ))),
+            (None, Some(_)) => Some(Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                "reached the end of r1 before r2",
+            ))),
+            (Some(Err(err)), _) => Some(Err(err)),
+            (_, Some(Err(err))) => Some(Err(err)),
         }
     }
 }
@@ -61,9 +63,19 @@ mod test {
         let mut paired_iterator = PairedRecords::new(records_r1, records_r2);
         let result = paired_iterator.next();
 
+        let error = result
+            .expect("should return an element")
+            .err()
+            .expect("should return an error");
         assert_eq!(
-            result.unwrap().err().unwrap().to_string(),
-            "reached the end of r2 before r1"
+            error.kind(),
+            ErrorKind::UnexpectedEof,
+            "should be of kind UnexpectedEof"
+        );
+        assert_eq!(
+            error.to_string(),
+            "reached the end of r2 before r1",
+            "should contain correct message"
         );
     }
 
@@ -75,9 +87,19 @@ mod test {
         let mut paired_iterator = PairedRecords::new(records_r1, records_r2);
         let result = paired_iterator.next();
 
+        let error = result
+            .expect("should return an element")
+            .err()
+            .expect("should return an error");
         assert_eq!(
-            result.unwrap().err().unwrap().to_string(),
-            "reached the end of r1 before r2"
+            error.kind(),
+            ErrorKind::UnexpectedEof,
+            "should be of kind UnexpectedEof"
+        );
+        assert_eq!(
+            error.to_string(),
+            "reached the end of r1 before r2",
+            "should contain correct message"
         );
     }
 
@@ -90,32 +112,52 @@ mod test {
         let mut paired_iterator = PairedRecords::new(records_r1, records_r2);
         let result = paired_iterator.next();
 
+        let error = result
+            .expect("should return an element")
+            .err()
+            .expect("should return an error");
         assert_eq!(
-            result.unwrap().err().unwrap().to_string(),
-            "read pair had different read IDs: (id_a, id_b)"
+            error.kind(),
+            ErrorKind::InvalidData,
+            "should be of kind InvalidData"
+        );
+        assert_eq!(
+            error.to_string(),
+            "read pair had different read IDs: (id_a, id_b)",
+            "should contain correct message"
         );
     }
 
-    struct MockFastx<'a> {
-        id: &'a str,
-        seq: &'a [u8],
-        broken_message: Option<&'a str>,
+    #[test]
+    fn test_r1_error() {
+        let records_r1 =
+            vec![Err(Error::new(ErrorKind::Other, "I'm broken")) as Result<fasta::Record, Error>]
+                .into_iter();
+        let records_r2 = vec![Err(Error::new(ErrorKind::Other, "I'm also broken"))].into_iter();
+        let mut paired_iterator = PairedRecords::new(records_r1, records_r2);
+        let result = paired_iterator.next();
+
+        let error = result
+            .expect("should return an element")
+            .err()
+            .expect("should return an error");
+        assert_eq!(error.kind(), ErrorKind::Other, "should be of kind Other");
+        assert_eq!(error.to_string(), "I'm broken");
     }
 
-    impl<'a> fastx::Record for MockFastx<'a> {
-        fn id(&self) -> &str {
-            &self.id
-        }
+    #[test]
+    fn test_r2_error() {
+        let record_r1 = fasta::Record::with_attrs("id_a", None, &[]);
+        let records_r1 = vec![Ok(record_r1)].into_iter();
+        let records_r2 = vec![Err(Error::new(ErrorKind::Other, "I'm broken"))].into_iter();
+        let mut paired_iterator = PairedRecords::new(records_r1, records_r2);
+        let result = paired_iterator.next();
 
-        fn seq(&self) -> &[u8] {
-            &self.seq
-        }
-
-        fn check(&self) -> Result<(), &str> {
-            match self.broken_message {
-                Some(message) => Err(message),
-                None => Ok(()),
-            }
-        }
+        let error = result
+            .expect("should return an element")
+            .err()
+            .expect("should return an error");
+        assert_eq!(error.kind(), ErrorKind::Other, "should be of kind Other");
+        assert_eq!(error.to_string(), "I'm broken");
     }
 }
