@@ -62,7 +62,11 @@ idseq-dedup -i my-fastq.fastq -o my-deduped-fastq.fastq
 Deduplicate paired reads (note, inputs are paired to outputs by order not name):
 
 ```bash
-idseq-dedup -i my-fasta-r1.fasta -i my-fasta-r2.fasta -o my-deduped-fasta-r1.fasta -o my-deduped-fasta-r2.fasta
+idseq-dedup \
+	-i my-fasta-r1.fasta \
+	-i my-fasta-r2.fasta \
+	-o my-deduped-fasta-r1.fasta \
+	-o my-deduped-fasta-r2.fasta
 ```
 
 Deduplicate only considering a prefix of length `70`:
