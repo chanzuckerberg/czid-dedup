@@ -2,18 +2,16 @@ name: Rust
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  release:
+    types: [created]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
+    name: Check
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
@@ -28,4 +26,26 @@ jobs:
         RUSTFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests'
         RUSTDOCFLAGS: '-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests'
     - uses: actions-rs/grcov@v0.1
+      if: ${{ github.event_name != 'release' }}
     - uses: codecov/codecov-action@v1
+
+  release:
+    name: Release
+    runs-on: ${{ matrix.os }}
+    if: ${{ github.event_name == 'release' }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build
+      run: cargo build --release --locked
+    - name: Upload binaries to release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: target/release/idseq-dedup${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+        asset_name: idseq-dedup-${{ runner.os }}
+        tag: ${{ github.ref }}
+        overwrite: true
+
