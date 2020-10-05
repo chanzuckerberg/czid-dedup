@@ -7,14 +7,18 @@ pub struct PairedRecords<T: fastx::Record, R: Iterator<Item = Result<T, std::io:
     records_r2: R,
 }
 
-impl <T: fastx::Record, R: Iterator<Item = Result<T, std::io::Error>>> PairedRecords<T, R> {
+impl<T: fastx::Record, R: Iterator<Item = Result<T, std::io::Error>>> PairedRecords<T, R> {
     pub fn new(records_r1: R, records_r2: R) -> Self {
-        PairedRecords{ records_r1: records_r1, records_r2: records_r2 }
+        PairedRecords {
+            records_r1: records_r1,
+            records_r2: records_r2,
+        }
     }
-
 }
 
-impl <A: fastx::Record, T: Iterator<Item = Result<A, std::io::Error>>> Iterator for PairedRecords<A, T> {
+impl<A: fastx::Record, T: Iterator<Item = Result<A, std::io::Error>>> Iterator
+    for PairedRecords<A, T>
+{
     type Item = Result<(A, A), Box<dyn Error>>;
 
     fn next(&mut self) -> Option<Result<(A, A), Box<dyn Error>>> {
@@ -23,13 +27,21 @@ impl <A: fastx::Record, T: Iterator<Item = Result<A, std::io::Error>>> Iterator 
                 if r1_record.id() == r2_record.id() {
                     Some(Ok((r1_record, r2_record)))
                 } else {
-                    let message = format!("read pair had different read IDs: ({}, {})", r1_record.id(), r2_record.id());
+                    let message = format!(
+                        "read pair had different read IDs: ({}, {})",
+                        r1_record.id(),
+                        r2_record.id()
+                    );
                     Some(Err(Box::new(simple_error::simple_error!(message))))
                 }
-            },
+            }
             (None, None) => None,
-            (Some(_), None) => Some(Err(Box::new(simple_error::simple_error!("reached the end of r2 before r1")))),
-            (None, Some(_)) => Some(Err(Box::new(simple_error::simple_error!("reached the end of r1 before r2")))),
+            (Some(_), None) => Some(Err(Box::new(simple_error::simple_error!(
+                "reached the end of r2 before r1"
+            )))),
+            (None, Some(_)) => Some(Err(Box::new(simple_error::simple_error!(
+                "reached the end of r1 before r2"
+            )))),
             (Some(Err(err)), _) => Some(Err(Box::new(err))),
             (_, Some(Err(err))) => Some(Err(Box::new(err))),
         }
@@ -49,7 +61,10 @@ mod test {
         let mut paired_iterator = PairedRecords::new(records_r1, records_r2);
         let result = paired_iterator.next();
 
-        assert_eq!(result.unwrap().err().unwrap().to_string(), "reached the end of r2 before r1");
+        assert_eq!(
+            result.unwrap().err().unwrap().to_string(),
+            "reached the end of r2 before r1"
+        );
     }
 
     #[test]
@@ -60,7 +75,10 @@ mod test {
         let mut paired_iterator = PairedRecords::new(records_r1, records_r2);
         let result = paired_iterator.next();
 
-        assert_eq!(result.unwrap().err().unwrap().to_string(), "reached the end of r1 before r2");
+        assert_eq!(
+            result.unwrap().err().unwrap().to_string(),
+            "reached the end of r1 before r2"
+        );
     }
 
     #[test]
@@ -72,17 +90,19 @@ mod test {
         let mut paired_iterator = PairedRecords::new(records_r1, records_r2);
         let result = paired_iterator.next();
 
-        assert_eq!(result.unwrap().err().unwrap().to_string(), "read pair had different read IDs: (id_a, id_b)");
+        assert_eq!(
+            result.unwrap().err().unwrap().to_string(),
+            "read pair had different read IDs: (id_a, id_b)"
+        );
     }
-
 
     struct MockFastx<'a> {
         id: &'a str,
         seq: &'a [u8],
-        broken_message: Option<&'a str>
+        broken_message: Option<&'a str>,
     }
 
-    impl <'a> fastx::Record for MockFastx<'a> {
+    impl<'a> fastx::Record for MockFastx<'a> {
         fn id(&self) -> &str {
             &self.id
         }

@@ -1,7 +1,7 @@
 use bio::io::{fasta, fastq};
-use std::io::Write;
 use std::fs::File;
 use std::io::prelude::*;
+use std::io::Write;
 
 pub trait Record {
     fn id(&self) -> &str;
@@ -28,11 +28,9 @@ impl Record for fastq::Record {
         self.id()
     }
 
-
     fn seq(&self) -> &[u8] {
         self.seq()
     }
-
 
     fn check(&self) -> Result<(), &str> {
         self.check()
@@ -69,7 +67,7 @@ pub fn fastx_type<P: AsRef<std::path::Path>>(path: P) -> Result<FastxType, std::
     };
     let mut byte = [0; 1];
     if let Err(err) = file.read(&mut byte) {
-        return Err(err)
+        return Err(err);
     }
 
     match byte[0] as char {
@@ -89,4 +87,3 @@ impl std::fmt::Display for FastxType {
         write!(f, "{}", s)
     }
 }
-
