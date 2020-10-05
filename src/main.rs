@@ -90,7 +90,7 @@ fn pair<
     mut clusters: clusters::Clusters<U>,
 ) -> Result<clusters::Clusters<U>, Box<dyn Error>> {
     for result in records {
-        let (record_r1, record_r2) = unwrap_or_return!(result);
+        let (record_r1, record_r2) = box_bail!(result);
 
         box_bail!(record_r1
             .check()
