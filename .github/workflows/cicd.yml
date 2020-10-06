@@ -23,7 +23,7 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: fmt
-    - name: Fail not unformatted
+    - name: Fail if Unformatted
       run: git diff --exit-code
     - name: Check
       uses: actions-rs/cargo@v1
@@ -61,6 +61,9 @@ jobs:
       uses: actions/checkout@v2
     - name: Build
       run: cargo build --release --locked
+    - name: Make Executable
+      if: ${{ matrix.os != 'windows-latest' }}
+      run: chmod +x target/release/idseq-dedup
     - name: Upload binaries
       uses: svenstaro/upload-release-action@v2
       with:
