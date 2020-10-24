@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io;
 
 use super::fastx;
+use super::paired::PairedRecord;
 
 pub struct Clusters<T: io::Write> {
     cluster_map: HashMap<u64, String>,
@@ -49,15 +50,14 @@ impl<T: std::io::Write> Clusters<T> {
 
     pub fn insert_pair<R: fastx::Record>(
         &mut self,
-        record_r1: &R,
-        record_r2: &R,
+        record: &PairedRecord<R>,
     ) -> Result<bool, csv::Error> {
         let mut seq_hasher = DefaultHasher::new();
-        Hash::hash_slice(self.get_prefix(record_r1.seq()), &mut seq_hasher);
+        Hash::hash_slice(self.get_prefix(record.r1().seq()), &mut seq_hasher);
         Hash::hash(&0, &mut seq_hasher);
-        Hash::hash_slice(self.get_prefix(record_r2.seq()), &mut seq_hasher);
+        Hash::hash_slice(self.get_prefix(record.r2().seq()), &mut seq_hasher);
         let seq_hash = seq_hasher.finish();
-        self.insert_record(seq_hash, record_r1.id().to_owned())
+        self.insert_record(seq_hash, record.id().to_owned())
     }
 
     pub fn unique_records(&self) -> u64 {
@@ -112,6 +112,7 @@ mod test {
 
     use bio::io::fasta;
     use rand::Rng;
+    use std::convert::TryFrom;
     use std::io::Cursor;
     use std::str;
 
@@ -158,12 +159,12 @@ mod test {
             let record_1_r1 = fasta::Record::with_attrs("id_a", None, &seq_r1);
             let record_1_r2 = fasta::Record::with_attrs("id_a", None, &seq_r2);
             clusters
-                .insert_pair(&record_1_r1, &record_1_r2)
+                .insert_pair(&PairedRecord::try_from((record_1_r1, record_1_r2)).unwrap())
                 .expect("don't break");
             let record_2_r1 = fasta::Record::with_attrs("id_b", None, &seq_r1);
             let record_2_r2 = fasta::Record::with_attrs("id_b", None, &seq_r2);
             clusters
-                .insert_pair(&record_2_r1, &record_2_r2)
+                .insert_pair(&PairedRecord::try_from((record_2_r1, record_2_r2)).unwrap())
                 .expect("don't break");
             assert_eq!(clusters.duplicate_records(), 1);
             assert_eq!(clusters.unique_records(), 1);
