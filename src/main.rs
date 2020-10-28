@@ -90,19 +90,16 @@ fn pair<
     mut clusters: clusters::Clusters<U>,
 ) -> Result<clusters::Clusters<U>, Box<dyn Error>> {
     for result in records {
-        let (record_r1, record_r2) = box_bail!(result);
+        let record = box_bail!(result);
 
-        box_bail!(record_r1
+        box_bail!(record
             .check()
-            .map_err(|err| simple_error::simple_error!(err)));
-        box_bail!(record_r2
-            .check()
-            .map_err(|err| simple_error::simple_error!(err)));
+            .map_err(|err| simple_error::simple_error!(&err)));
 
-        let result = clusters.insert_pair(&record_r1, &record_r2);
+        let result = clusters.insert_pair(&record);
         if box_bail!(result) {
-            box_bail!(writer_r1.write_record(&record_r1));
-            box_bail!(writer_r2.write_record(&record_r2));
+            box_bail!(writer_r1.write_record(record.r1()));
+            box_bail!(writer_r2.write_record(record.r2()));
         }
     }
     Ok(clusters)

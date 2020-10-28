@@ -1,6 +1,56 @@
+use std::convert::TryFrom;
 use std::io::{Error, ErrorKind};
 
 use super::fastx;
+
+pub struct PairedRecord<T: fastx::Record> {
+    r1: T,
+    r2: T,
+}
+
+impl<T: fastx::Record> PairedRecord<T> {
+    pub fn id(&self) -> &str {
+        self.r1.id()
+    }
+
+    pub fn check(&self) -> Result<(), String> {
+        self.r1
+            .check()
+            .map_err(|err| format!("r1: {}", err))
+            .and_then(|_| self.r2.check().map_err(|err| format!("r2: {}", err)))
+    }
+
+    pub fn r1(&self) -> &T {
+        &self.r1
+    }
+
+    pub fn r2(&self) -> &T {
+        &self.r2
+    }
+}
+
+impl<T: fastx::Record> Into<(T, T)> for PairedRecord<T> {
+    fn into(self) -> (T, T) {
+        (self.r1, self.r2)
+    }
+}
+
+impl<T: fastx::Record> TryFrom<(T, T)> for PairedRecord<T> {
+    type Error = Error;
+
+    fn try_from((r1, r2): (T, T)) -> Result<Self, Self::Error> {
+        if r1.id() == r2.id() {
+            Ok(PairedRecord { r1: r1, r2: r2 })
+        } else {
+            let message = format!(
+                "read pair had different read IDs: ({}, {})",
+                r1.id(),
+                r2.id()
+            );
+            Err(Error::new(ErrorKind::InvalidData, message))
+        }
+    }
+}
 
 pub struct PairedRecords<T: fastx::Record, R: Iterator<Item = Result<T, std::io::Error>>> {
     records_r1: R,
@@ -19,21 +69,12 @@ impl<T: fastx::Record, R: Iterator<Item = Result<T, std::io::Error>>> PairedReco
 impl<A: fastx::Record, T: Iterator<Item = Result<A, std::io::Error>>> Iterator
     for PairedRecords<A, T>
 {
-    type Item = Result<(A, A), Error>;
+    type Item = Result<PairedRecord<A>, Error>;
 
-    fn next(&mut self) -> Option<Result<(A, A), Error>> {
+    fn next(&mut self) -> Option<Result<PairedRecord<A>, Error>> {
         match (self.records_r1.next(), self.records_r2.next()) {
             (Some(Ok(r1_record)), Some(Ok(r2_record))) => {
-                if r1_record.id() == r2_record.id() {
-                    Some(Ok((r1_record, r2_record)))
-                } else {
-                    let message = format!(
-                        "read pair had different read IDs: ({}, {})",
-                        r1_record.id(),
-                        r2_record.id()
-                    );
-                    Some(Err(Error::new(ErrorKind::InvalidData, message)))
-                }
+                Some(PairedRecord::try_from((r1_record, r2_record)))
             }
             (None, None) => None,
             (Some(_), None) => Some(Err(Error::new(
