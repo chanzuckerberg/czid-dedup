@@ -16,6 +16,7 @@ pub struct Cluster {
 
 pub struct Clusters<T: io::Write> {
     cluster_map: HashMap<u64, Cluster>,
+    cluster_order: Vec<u64>,
     cluster_csv_writer: Option<csv::Writer<T>>,
     total_records: u64,
     prefix_length_opt: Option<usize>,
@@ -43,6 +44,7 @@ impl<T: std::io::Write> Clusters<T> {
                         .map(|_| true)
                 });
                 self.cluster_map.insert(seq_hash, Cluster { id, size: 1 });
+                self.cluster_order.push(seq_hash);
                 res_opt.unwrap_or(Ok(true))
             }
         }
@@ -93,7 +95,9 @@ impl<T: std::io::Write> Clusters<T> {
         csv_writer: &mut csv::Writer<R>,
     ) -> Result<(), csv::Error> {
         csv_writer.write_record(vec!["representative read id", "cluster size"])?;
-        for cluster in self.cluster_map.values() {
+        for cluster_hash in self.cluster_order.iter() {
+            // guarunteed to be present
+            let cluster = self.cluster_map.get(cluster_hash).unwrap();
             csv_writer.write_record(vec![&cluster.id, &cluster.size.to_string()])?;
         }
         Ok(())
@@ -106,6 +110,7 @@ impl<T: std::io::Write> Clusters<T> {
     ) -> Result<Self, csv::Error> {
         let cluster_csv_writer_opt = cluster_output_opt.map(csv::Writer::from_writer);
         let cluster_map = HashMap::with_capacity(capacity);
+        let cluster_order = Vec::with_capacity(capacity);
         let cluster_csv_writer = cluster_csv_writer_opt
             .map(|mut cluster_csv_writer| {
                 cluster_csv_writer
@@ -115,6 +120,7 @@ impl<T: std::io::Write> Clusters<T> {
             .unwrap_or(Ok(None))?;
         Ok(Clusters {
             cluster_map,
+            cluster_order,
             cluster_csv_writer,
             total_records: 0,
             prefix_length_opt,
