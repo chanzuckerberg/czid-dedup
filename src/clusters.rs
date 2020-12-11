@@ -96,7 +96,7 @@ impl<T: std::io::Write> Clusters<T> {
     ) -> Result<(), csv::Error> {
         csv_writer.write_record(vec!["representative read id", "cluster size"])?;
         for cluster_hash in self.cluster_order.iter() {
-            // guarunteed to be present
+            // guaranteed to be present
             let cluster = self.cluster_map.get(cluster_hash).unwrap();
             csv_writer.write_record(vec![&cluster.id, &cluster.size.to_string()])?;
         }
