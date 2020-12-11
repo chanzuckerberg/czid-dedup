@@ -46,9 +46,9 @@ macro_rules! dedup {
                 let records_r2 = $fastx::Reader::from_file(input_r2).unwrap().records();
                 let writer_r2 = $fastx::Writer::to_file(output_r2).unwrap();
                 let records = paired::PairedRecords::new(records_r1, records_r2);
-                pair(records, writer_r1, writer_r2, $clusters)
+                pair(records, writer_r1, writer_r2, &mut $clusters)
             }
-            (None, None) => single(records_r1, writer_r1, $clusters),
+            (None, None) => single(records_r1, writer_r1, &mut $clusters),
             _ => panic!("must have the same number of inputs and outputs"),
         }
     }};
@@ -62,8 +62,8 @@ fn single<
 >(
     records: R,
     mut writer: S,
-    mut clusters: clusters::Clusters<U>,
-) -> Result<clusters::Clusters<U>, Box<dyn Error>> {
+    clusters: &mut clusters::Clusters<U>,
+) -> Result<(), Box<dyn Error>> {
     for result in records {
         let record = box_bail!(result);
         box_bail!(record
@@ -75,7 +75,7 @@ fn single<
             box_bail!(writer.write_record(&record));
         }
     }
-    Ok(clusters)
+    Ok(())
 }
 
 fn pair<
@@ -87,8 +87,8 @@ fn pair<
     records: paired::PairedRecords<T, R>,
     mut writer_r1: S,
     mut writer_r2: S,
-    mut clusters: clusters::Clusters<U>,
-) -> Result<clusters::Clusters<U>, Box<dyn Error>> {
+    clusters: &mut clusters::Clusters<U>,
+) -> Result<(), Box<dyn Error>> {
     for result in records {
         let record = box_bail!(result);
 
@@ -102,7 +102,7 @@ fn pair<
             box_bail!(writer_r2.write_record(record.r2()));
         }
     }
-    Ok(clusters)
+    Ok(())
 }
 
 fn run_dedup<T: Into<std::ffi::OsString> + Clone, R: IntoIterator<Item = T>>(
@@ -139,8 +139,13 @@ fn run_dedup<T: Into<std::ffi::OsString> + Clone, R: IntoIterator<Item = T>>(
                 .short("c")
                 .long("cluster-output")
                 .help("Output cluster file")
-                .takes_value(true)
-                .default_value("clusters.csv"),
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("cluster-size-output")
+                .long("cluster-size-output")
+                .help("Output cluster size file")
+                .takes_value(true),
         )
         .arg(
             Arg::with_name("prefix-length")
@@ -154,7 +159,8 @@ fn run_dedup<T: Into<std::ffi::OsString> + Clone, R: IntoIterator<Item = T>>(
     // presence guarunteed by clap
     let mut inputs = matches.values_of("inputs").unwrap();
     let mut outputs = matches.values_of("deduped-outputs").unwrap();
-    let cluster_output = matches.value_of("cluster-output").unwrap();
+    let cluster_output_opt = matches.value_of("cluster-output");
+    let cluster_size_output_opt = matches.value_of("cluster-size-output");
     let prefix_length_opt = matches
         .value_of("prefix-length")
         .map(|n| n.parse::<usize>().unwrap());
@@ -163,8 +169,8 @@ fn run_dedup<T: Into<std::ffi::OsString> + Clone, R: IntoIterator<Item = T>>(
 
     let bytes = File::open(input_r1).unwrap().metadata().unwrap().len() as usize;
     // 400 is based on the bytes per record of an example file, should be reasonable
-    let clusters =
-        clusters::Clusters::from_file(cluster_output, prefix_length_opt, bytes / 400).unwrap();
+    let mut clusters =
+        clusters::Clusters::from_file(cluster_output_opt, prefix_length_opt, bytes / 400).unwrap();
 
     match fastx::fastx_type(input_r1).unwrap() {
         fastx::FastxType::Fasta => dedup!(
@@ -188,7 +194,13 @@ fn run_dedup<T: Into<std::ffi::OsString> + Clone, R: IntoIterator<Item = T>>(
         fastx::FastxType::Invalid => Err(Box::new(simple_error::simple_error!(
             "input file is not a valid FASTA or FASTQ file"
         )) as Box<dyn Error>),
+    }?;
+
+    if let Some(cluster_sizes_output) = cluster_size_output_opt {
+        let mut cluster_sizes_writer = csv::Writer::from_path(cluster_sizes_output)?;
+        clusters.write_sizes(&mut cluster_sizes_writer)?;
     }
+    Ok(clusters)
 }
 
 fn main() {
