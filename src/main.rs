@@ -139,13 +139,13 @@ fn run_dedup<T: Into<std::ffi::OsString> + Clone, R: IntoIterator<Item = T>>(
                 .short("c")
                 .long("cluster-output")
                 .help("Output cluster file")
-                .takes_value(true)
+                .takes_value(true),
         )
         .arg(
             Arg::with_name("cluster-size-output")
                 .long("cluster-size-output")
                 .help("Output cluster size file")
-                .takes_value(true)
+                .takes_value(true),
         )
         .arg(
             Arg::with_name("prefix-length")
@@ -195,7 +195,7 @@ fn run_dedup<T: Into<std::ffi::OsString> + Clone, R: IntoIterator<Item = T>>(
             "input file is not a valid FASTA or FASTQ file"
         )) as Box<dyn Error>),
     }?;
-    
+
     if let Some(cluster_sizes_output) = cluster_size_output_opt {
         let mut cluster_sizes_writer = csv::Writer::from_path(cluster_sizes_output)?;
         clusters.write_sizes(&mut cluster_sizes_writer)?;

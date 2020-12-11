@@ -27,14 +27,21 @@ impl<T: std::io::Write> Clusters<T> {
         match self.cluster_map.get_mut(&seq_hash) {
             Some(mut cluster) => {
                 cluster.size += 1;
-                self.cluster_csv_writer.as_mut().map(|cluster_csv_writer|
-                    cluster_csv_writer.write_record(vec![&cluster.id, &id]).map(|_| false)
-                ).unwrap_or(Ok(false))
-            },
+                self.cluster_csv_writer
+                    .as_mut()
+                    .map(|cluster_csv_writer| {
+                        cluster_csv_writer
+                            .write_record(vec![&cluster.id, &id])
+                            .map(|_| false)
+                    })
+                    .unwrap_or(Ok(false))
+            }
             None => {
-                let res_opt = self.cluster_csv_writer.as_mut().map(|cluster_csv_writer|
-                    cluster_csv_writer.write_record(vec![&id, &id]).map(|_| true)
-                );
+                let res_opt = self.cluster_csv_writer.as_mut().map(|cluster_csv_writer| {
+                    cluster_csv_writer
+                        .write_record(vec![&id, &id])
+                        .map(|_| true)
+                });
                 self.cluster_map.insert(seq_hash, Cluster { id, size: 1 });
                 res_opt.unwrap_or(Ok(true))
             }
@@ -81,7 +88,10 @@ impl<T: std::io::Write> Clusters<T> {
         self.total_records
     }
 
-    pub fn write_sizes<R: std::io::Write>(&self, csv_writer: &mut csv::Writer<R>) -> Result<(), csv::Error> {
+    pub fn write_sizes<R: std::io::Write>(
+        &self,
+        csv_writer: &mut csv::Writer<R>,
+    ) -> Result<(), csv::Error> {
         csv_writer.write_record(vec!["representative read id", "cluster size"])?;
         for cluster in self.cluster_map.values() {
             csv_writer.write_record(vec![&cluster.id, &cluster.size.to_string()])?;
@@ -104,10 +114,10 @@ impl<T: std::io::Write> Clusters<T> {
             })
             .unwrap_or(Ok(None))?;
         Ok(Clusters {
-             cluster_map,
-             cluster_csv_writer,
-             total_records: 0,
-             prefix_length_opt,
+            cluster_map,
+            cluster_csv_writer,
+            total_records: 0,
+            prefix_length_opt,
         })
     }
 }
@@ -118,7 +128,10 @@ impl Clusters<File> {
         prefix_length_opt: Option<usize>,
         capacity: usize,
     ) -> Result<Self, csv::Error> {
-        cluster_output_path_opt.map(|cluster_output_path| File::create(cluster_output_path).map(|cluster_output| Some(cluster_output)))
+        cluster_output_path_opt
+            .map(|cluster_output_path| {
+                File::create(cluster_output_path).map(|cluster_output| Some(cluster_output))
+            })
             .unwrap_or(Ok(None))
             .map_err(csv::Error::from)
             .and_then(|cluster_output| {
@@ -213,10 +226,15 @@ mod test {
             let seq2 = random_seq(20);
             let record_3 = fasta::Record::with_attrs("id_c", None, &seq2);
             clusters.insert_single(&record_3).expect("don't break");
-            clusters.write_sizes(&mut cluster_sizes_output).expect("don't break");
+            clusters
+                .write_sizes(&mut cluster_sizes_output)
+                .expect("don't break");
         }
         let cluster_sizes_output_inner = cluster_sizes_writer.into_inner();
         let cluster_sizes = str::from_utf8(cluster_sizes_output_inner.as_slice()).unwrap();
-        assert_eq!(cluster_sizes, "representative read id,cluster size\nid_a,2\nid_c,1\n");
+        assert_eq!(
+            cluster_sizes,
+            "representative read id,cluster size\nid_a,2\nid_c,1\n"
+        );
     }
 }
