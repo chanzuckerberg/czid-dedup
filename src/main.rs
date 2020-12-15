@@ -229,8 +229,8 @@ mod test {
 
     use bio::io::fastq;
     use rand::Rng;
-    use tempfile::tempdir;
     use std::path::Path;
+    use tempfile::tempdir;
 
     fn random_seq(len: usize) -> Vec<u8> {
         const CHARSET: &[u8] = b"ACTG";
@@ -249,7 +249,9 @@ mod test {
         inverses.insert(b'T', b'A');
         inverses.insert(b'C', b'G');
         inverses.insert(b'G', b'C');
-        seq.iter().map(|base_pair| inverses.get(base_pair).unwrap().clone()).collect()
+        seq.iter()
+            .map(|base_pair| inverses.get(base_pair).unwrap().clone())
+            .collect()
     }
 
     fn generate_paired_sequence_files<P1: AsRef<Path>, P2: AsRef<Path>>(
@@ -263,9 +265,14 @@ mod test {
         let mut rng = rand::thread_rng();
         let mut writer_r1 = fasta::Writer::to_file(path_r1)?;
         let mut writer_r2 = fasta::Writer::to_file(path_r2)?;
-        let sequences: Vec<Vec<u8>> = (0..possible_sequences).map(|_| {
-            random_seq(mean_sequence_length - sequence_length_noise + (2 * rng.gen_range(0, sequence_length_noise)))
-        }).collect();
+        let sequences: Vec<Vec<u8>> = (0..possible_sequences)
+            .map(|_| {
+                random_seq(
+                    mean_sequence_length - sequence_length_noise
+                        + (2 * rng.gen_range(0, sequence_length_noise)),
+                )
+            })
+            .collect();
         for i in 0..total_sequences {
             let r1 = &sequences[rng.gen_range(0, sequences.len())];
             let r2 = reverse_complement(&r1);
@@ -391,7 +398,8 @@ mod test {
             .to_string();
         let cluster_path = dir.path().join("cluster.csv").to_str().unwrap().to_string();
 
-        generate_paired_sequence_files(&input_path_r1, &input_path_r2, 100, 10, 10000, 15000).unwrap();
+        generate_paired_sequence_files(&input_path_r1, &input_path_r2, 100, 10, 10000, 15000)
+            .unwrap();
 
         b.iter(|| {
             let args = [
