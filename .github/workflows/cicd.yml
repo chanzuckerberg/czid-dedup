@@ -48,6 +48,13 @@ jobs:
     - name: Upload Coverage
       uses: codecov/codecov-action@v1
       if: ${{ !startsWith(github.ref, 'refs/tag') }}
+    - name: Run Benchmark
+      run: cargo +nightly bench | tee output.txt
+    - name: Upload Benchmark
+      uses: rhysd/github-action-benchmark@v1
+      with:
+        tool: 'cargo'
+        output-file-path: output.txt
 
   release:
     name: Release

@@ -16,3 +16,6 @@ simple-error = "0.2.2"
 [dev-dependencies]
 rand = "0.7.3"
 tempfile = "3.0.7"
+
+[profile.bench]
+lto = true
