@@ -37,6 +37,7 @@ jobs:
     - name: Test
       uses: actions-rs/cargo@v1
       with:
+        toolchain: nightly
         command: test
       env:
         CARGO_INCREMENTAL: '0'
