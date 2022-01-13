@@ -1,5 +1,5 @@
 [package]
-name = "idseq-dedup"
+name = "czid-dedup"
 version = "0.1.0"
 authors = ["morsecodist <todd@morsecodist.io>"]
 description = "Deduplicates reads from FASTA and FASTQ files"

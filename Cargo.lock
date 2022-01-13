@@ -208,6 +208,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef8ae57c4978a2acd8b869ce6b9ca1dfe817bff704c220209fdef2c0b75a01b9"
 
 [[package]]
+name = "czid-dedup"
+version = "0.1.0"
+dependencies = [
+ "bio",
+ "clap",
+ "csv",
+ "rand",
+ "simple-error",
+ "tempfile",
+]
+
+[[package]]
 name = "derive-new"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -322,18 +334,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c30f6d0bc6b00693347368a67d41b58f2fb851215ff1da49e90fe2c5c667151"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "idseq-dedup"
-version = "0.1.0"
-dependencies = [
- "bio",
- "clap",
- "csv",
- "rand",
- "simple-error",
- "tempfile",
 ]
 
 [[package]]
