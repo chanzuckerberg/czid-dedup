@@ -1,3 +1,5 @@
+#![feature(test)]
+
 use bio::io::{fasta, fastq};
 use clap::{App, Arg};
 use simple_error;
@@ -220,10 +222,14 @@ fn main() {
 
 #[cfg(test)]
 mod test {
+    extern crate test;
+
     use super::*;
+    use test::Bencher;
 
     use bio::io::fastq;
     use rand::Rng;
+    use std::path::Path;
     use tempfile::tempdir;
 
     fn random_seq(len: usize) -> Vec<u8> {
@@ -235,6 +241,45 @@ mod test {
                 CHARSET[idx]
             })
             .collect()
+    }
+
+    fn reverse_complement(seq: &Vec<u8>) -> Vec<u8> {
+        let mut inverses = std::collections::HashMap::new();
+        inverses.insert(b'A', b'T');
+        inverses.insert(b'T', b'A');
+        inverses.insert(b'C', b'G');
+        inverses.insert(b'G', b'C');
+        seq.iter()
+            .map(|base_pair| inverses.get(base_pair).unwrap().clone())
+            .collect()
+    }
+
+    fn generate_paired_sequence_files<P1: AsRef<Path>, P2: AsRef<Path>>(
+        path_r1: P1,
+        path_r2: P2,
+        mean_sequence_length: usize,
+        sequence_length_noise: usize,
+        possible_sequences: usize,
+        total_sequences: usize,
+    ) -> Result<(), std::io::Error> {
+        let mut rng = rand::thread_rng();
+        let mut writer_r1 = fasta::Writer::to_file(path_r1)?;
+        let mut writer_r2 = fasta::Writer::to_file(path_r2)?;
+        let sequences: Vec<Vec<u8>> = (0..possible_sequences)
+            .map(|_| {
+                random_seq(
+                    mean_sequence_length - sequence_length_noise
+                        + (2 * rng.gen_range(0, sequence_length_noise)),
+                )
+            })
+            .collect();
+        for i in 0..total_sequences {
+            let r1 = &sequences[rng.gen_range(0, sequences.len())];
+            let r2 = reverse_complement(&r1);
+            writer_r1.write(&i.to_string(), None, &r1)?;
+            writer_r2.write(&i.to_string(), None, &r2)?;
+        }
+        Ok(())
     }
 
     #[test]
@@ -321,6 +366,57 @@ mod test {
         ];
         let result = run_dedup(&args).expect("don't break");
         assert_eq!(result.total_records(), 1);
+        dir.close().expect("don't break");
+    }
+
+    #[bench]
+    fn bench_run_dedup_paired(b: &mut Bencher) {
+        let dir = tempdir().unwrap();
+        let input_path_r1 = dir
+            .path()
+            .join("input-r1.fasta")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let input_path_r2 = dir
+            .path()
+            .join("input-r2.fasta")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let output_path_r1 = dir
+            .path()
+            .join("output-r1.fasta")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let output_path_r2 = dir
+            .path()
+            .join("output-r2.fasta")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let cluster_path = dir.path().join("cluster.csv").to_str().unwrap().to_string();
+
+        generate_paired_sequence_files(&input_path_r1, &input_path_r2, 100, 10, 10000, 15000)
+            .unwrap();
+
+        b.iter(|| {
+            let args = [
+                "executable",
+                "-i",
+                &input_path_r1,
+                "-i",
+                &input_path_r2,
+                "-o",
+                &output_path_r1,
+                "-o",
+                &output_path_r2,
+                "-c",
+                &cluster_path,
+            ];
+            run_dedup(&args).expect("don't break");
+        });
         dir.close().expect("don't break");
     }
 
